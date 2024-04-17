@@ -1,0 +1,177 @@
+---
+title: "SAD- projekt 1"
+fontsize: 11pt
+geometry: margin=1in
+---
+## Autorzy
+
+Damian Lubaszka, Jakub Sadowski
+
+## Wykożystane pakiety i ustawiena
+```{R}
+require(tidyverse)
+theme_set(theme_bw())
+```
+
+## Zadanie 1
+
+Inflacja od 2023-01 do 2024-03
+```{R}
+infl_mies <- read_csv2("inflacja_mies.csv", locale=locale(encoding="latin1"),
+ show_col_types = FALSE)
+infl_mies <- infl_mies %>% filter(reprezentacja == "Poprzedni miesiac = 100")
+infl_mies <- infl_mies %>% select(Rok, Miesiac,Wartosc)
+infl_mies <- infl_mies %>%
+  mutate(Year_Month = as.Date(sprintf("%04d-%02d-01", Rok, Miesiac)))
+infl_mies <- infl_mies %>% filter(Year_Month < as.Date("2024-04-01"),
+ Year_Month >= as.Date("2023-01-01"))
+infl_mies <- infl_mies %>% arrange(Year_Month)
+abs_value <- numeric(length(infl_mies$Wartosc))
+abs_value[1] =  infl_mies$Wartosc[1] - 100.0
+for (i in 2:length(infl_mies$Wartosc)){
+    abs_value[i] <-  infl_mies$Wartosc[i] - 100 + abs_value[i-1]
+}
+
+infl_mies_modif <- tibble(date = infl_mies$Year_Month, wartosc = abs_value)
+
+ggplot(data = infl_mies_modif, aes(x=date, y = wartosc)) + geom_point() + 
+scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month") +
+ labs(x = "Rok i miesiąc", y = "Wzrost inflacji") + ggtitle("Inflacja")
+
+```
+
+```{R}
+products <- read_csv2("produkty.csv", locale=locale(encoding="latin1"),
+  show_col_types = FALSE)
+products <- products %>% select(id_pozycja_2, wartosc, opis_okres)
+products <- products %>% mutate(year_month = as.Date(paste(substr(opis_okres, 1, 4),
+substr(opis_okres, 7, 8), "01",sep = "-")))
+energy <- products %>% filter(id_pozycja_2 == 5946305)
+energy <- energy %>% arrange(year_month)
+water <- products %>% filter(id_pozycja_2 == 5946307)
+water <- water %>% arrange(year_month)
+heat <- products %>% filter(id_pozycja_2 == 5946309)
+heat <- heat %>% arrange(year_month)
+gaz <- products %>% filter(id_pozycja_2 == 7174400)
+gaz <- gaz %>% arrange(year_month)
+```
+
+```{R}
+ggplot(data = gaz, aes(x=year_month, y = wartosc)) + geom_point() + 
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+  labs(x = "Rok i miesiąc", y = "Koszt za 1 kWh [zł]") +
+  ggtitle("Gaz ziemny wysokometanowy z sieci dla gospodarstw domowych")
+```
+
+```{R}
+ggplot(data = heat, aes(x=year_month, y = wartosc)) + geom_point() + 
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+  labs(x = "Rok i miesiąc", y = "Koszt za 1 m2 p u [zł]") +
+  ggtitle("Centralne ogrzewanie lokali mieszkalnych")
+```
+
+```{R}
+ggplot(data = water, aes(x=year_month, y = wartosc)) + geom_point() +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+  labs(x = "Rok i miesiąc", y = "Koszt za za 1 m3 [zł]") +
+  ggtitle("Ciepła woda")
+```
+
+```{R}
+ggplot(data = energy, aes(x=year_month, y = wartosc)) + geom_point() +
+ scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+ labs(x = "Rok i miesiąc", y = "Koszt za 1 kWh [zł]") +
+  ggtitle("Energia elektryczna dla gospodarstw domowych")
+```
+## Oficjalna inflacja razem ze zmianami produktów 
+```{R}
+normalise <- function(x) {
+  normalised <- numeric(length(x))
+  normalised[1] = 0
+  for(i in 2:length(x)){
+    normalised[i] = x[i] * 100.0/x[i-1] - 100 + normalised[i-1]
+  }
+  normalised
+}
+```
+
+```{R}
+gaz$norm = normalise(gaz$wartosc)
+heat$norm = normalise(heat$wartosc)
+water$norm = normalise(water$wartosc)
+energy$norm = normalise(energy$wartosc)
+offset = infl_mies_modif$wartosc[1]
+infl_mies_modif <- infl_mies_modif %>% mutate(norm = infl_mies_modif$wartosc - offset)
+
+plot_data <- tibble(date = infl_mies_modif$date, gaz_norm = gaz$norm,
+  heat_norm = heat$norm,water_norm = water$norm,
+  energy_norm = energy$norm, infl_norm = infl_mies_modif$norm )
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = gaz_norm, color = "Gaz ziemny wysokometanowy z sieci "),
+   size = 1) +  
+  geom_line(aes(y = heat_norm, color = "Centralne ogrzewanie"), size = 1) +  
+  geom_line(aes(y = water_norm, color = "Ciepła woda"), size = 1) +  
+  geom_line(aes(y = energy_norm, color = "Energia elektryczna"), size = 1) +  
+  geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
+  ggtitle("Zmiany cen") + 
+  theme(legend.position = "bottom") +
+  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")
+  
+plot
+```
+
+## Zadanie 2
+
+Inflacja oraz nakład na badania i rozwój dla lat od 2000-2023
+```{R}
+infl = read_csv2("inflacja.csv", locale=locale(encoding="latin1"),
+  show_col_types = FALSE)
+infl = infl %>% select(Rok, Wartosc)
+infl = infl %>% arrange(Rok)
+abs_value <- numeric(length(infl$Wartosc))
+abs_value[1] =  infl$Wartosc[1] - 100.0
+for (i in 2:length(infl$Wartosc)){
+    abs_value[i] <-  infl$Wartosc[i] - 100 + abs_value[i-1]
+}
+
+modif_inflation <- tibble(rok = infl$Rok, wartosc =abs_value)
+modif_inflation  <- modif_inflation  %>% filter(rok >= 2000, rok <= 2022)
+ggplot(data = modif_inflation , aes(x=rok, y = wartosc)) + geom_point() + 
+  labs(x = "Rok", y = "Inflacja") +
+  ggtitle("Inflacja lata 2000-2023")
+
+
+```
+```{R}
+brl = read_csv2("brl.csv", show_col_types = FALSE)
+b = brl %>% select(id_zmienna, id_daty, wartosc)
+l = b %>% filter(id_zmienna == 581, id_daty <= 2022, id_daty >= 2000)
+b = b %>% filter(id_zmienna == 406, id_daty <= 2022, id_daty >= 2000)
+b = b %>% arrange(id_daty)
+l = l %>% arrange(id_daty)
+
+```
+
+```{R}
+b_all_money = b %>% mutate(wartosc = wartosc*l$wartosc)
+ggplot(data = b_all_money, aes(x=id_daty, y = wartosc)) + geom_point()
+```
+
+## Nałożone na siebie wartości inflacji oraz nakładów na badania i rozwój
+```{R}
+b_all_money$norm = normalise(b_all_money$wartosc)
+offset = modif_inflation$wartosc[1]
+modif_inflation <- modif_inflation %>% mutate(norm = modif_inflation$wartosc - offset)
+plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$norm,
+ b_norm = b_all_money$norm)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = b_norm, color = "Badania i rozwój"), size = 1) +  
+  geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok", y = "", color = "") +  
+  ggtitle("Nakłądy na badania i rozwój oraz inflacja") + 
+  theme(legend.position = "bottom")
+plot
+
+```

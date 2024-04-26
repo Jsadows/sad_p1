@@ -22,50 +22,70 @@ infl_mies <- read_csv2("inflacja_mies.csv", locale=locale(encoding="latin1"),
 infl_mies <- infl_mies %>% filter(reprezentacja == "Poprzedni miesiac = 100")
 infl_mies <- infl_mies %>% select(Rok, Miesiac,Wartosc)
 infl_mies <- infl_mies %>%
-  mutate(Year_Month = as.Date(sprintf("%04d-%02d-01", Rok, Miesiac)))
-infl_mies <- infl_mies %>% filter(Year_Month < as.Date("2024-04-01"),
- Year_Month >= as.Date("2023-01-01"))
-infl_mies <- infl_mies %>% arrange(Year_Month)
+  mutate(date = as.Date(sprintf("%04d-%02d-01", Rok, Miesiac)))
+infl_mies <- infl_mies %>% filter(date < as.Date("2024-04-01"),
+ date >= as.Date("2020-07-01"))
+infl_mies <- infl_mies %>% arrange(date)
 abs_value <- numeric(length(infl_mies$Wartosc))
+inflation_col <- numeric(length(infl_mies$Wartosc))
 abs_value[1] =  infl_mies$Wartosc[1] - 100.0
+inflation_col[1] = infl_mies$Wartosc[1] - 100.0
 for (i in 2:length(infl_mies$Wartosc)){
     abs_value[i] <-  infl_mies$Wartosc[i] - 100 + abs_value[i-1]
+    inflation_col[i] <- infl_mies$Wartosc[i] - 100.0
 }
-
-infl_mies_modif <- tibble(date = infl_mies$Year_Month, wartosc = abs_value)
-
-ggplot(data = infl_mies_modif, aes(x=date, y = wartosc)) + geom_point() + 
-scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month") +
- labs(x = "Rok i miesiąc", y = "Wzrost inflacji") + ggtitle("Inflacja")
+infl_mies$norm = abs_value
+infl_mies$inflation = inflation_col
+ggplot(data = infl_mies, aes(x=date, y =norm)) + geom_point() + 
+scale_x_date(date_labels = "%Y-%m") +
+ labs(x = "Rok i miesiąc", y = "Wzrost ceny względem roku 2000") 
 
 ```
+```{R}
+ggplot(data = infl_mies, aes(x=date, y = inflation)) + geom_line() + 
+scale_x_date(date_labels = "%Y-%m") +
+ labs(x = "Rok i miesiąc", y = "Inflacja") 
+
+```
+
 
 ```{R}
 products <- read_csv2("produkty.csv", locale=locale(encoding="latin1"),
   show_col_types = FALSE)
-products <- products %>% select(id_pozycja_2, wartosc, opis_okres)
+products <- products %>% select(id_pozycja_3, wartosc, opis_okres, id_pozycja_2)
 products <- products %>% mutate(year_month = as.Date(paste(substr(opis_okres, 1, 4),
-substr(opis_okres, 7, 8), "01",sep = "-")))
-energy <- products %>% filter(id_pozycja_2 == 5946305)
+  substr(opis_okres, 7, 8), "01",sep = "-")))
+energy <- products %>% filter(id_pozycja_3 == 5946305)
 energy <- energy %>% arrange(year_month)
-water <- products %>% filter(id_pozycja_2 == 5946307)
+water <- products %>% filter(id_pozycja_3 == 5946307)
 water <- water %>% arrange(year_month)
-heat <- products %>% filter(id_pozycja_2 == 5946309)
+heat <- products %>% filter(id_pozycja_3 == 5946309)
 heat <- heat %>% arrange(year_month)
-gaz <- products %>% filter(id_pozycja_2 == 7174400)
+gaz <- products %>% filter(id_pozycja_3 == 7174400)
 gaz <- gaz %>% arrange(year_month)
+bread <- products %>% filter(id_pozycja_2 == 5967449)
+bread <- bread %>% arrange(year_month)
+chicken <- products %>% filter(id_pozycja_2 == 5967456)
+chicken <- chicken %>% arrange(year_month)
+butter <- products %>% filter(id_pozycja_2 == 5967467)
+butter <- butter %>% arrange(year_month)
+eggs <- products %>% filter(id_pozycja_2 == 5967465)
+eggs <- eggs %>% arrange(year_month)
+cheese <- products %>% filter(id_pozycja_2 == 5967464)
+cheese <- cheese %>% arrange(year_month)
 ```
 
 ```{R}
+print(gaz)
 ggplot(data = gaz, aes(x=year_month, y = wartosc)) + geom_point() + 
-  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+  scale_x_date(date_labels = "%Y-%m")+
   labs(x = "Rok i miesiąc", y = "Koszt za 1 kWh [zł]") +
   ggtitle("Gaz ziemny wysokometanowy z sieci dla gospodarstw domowych")
 ```
 
 ```{R}
 ggplot(data = heat, aes(x=year_month, y = wartosc)) + geom_point() + 
-  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")+
+  scale_x_date(date_labels = "%Y-%m")+
   labs(x = "Rok i miesiąc", y = "Koszt za 1 m2 p u [zł]") +
   ggtitle("Centralne ogrzewanie lokali mieszkalnych")
 ```
@@ -85,6 +105,15 @@ ggplot(data = energy, aes(x=year_month, y = wartosc)) + geom_point() +
 ```
 ## Oficjalna inflacja razem ze zmianami produktów 
 ```{R}
+calc_infl <- function(x) {
+  infl <- numeric(length(x))
+  infl[1] = 0
+  for(i in 2:length(x)){
+    infl[i] = x[i] * 100.0/x[i-1] - 100 
+  }
+  infl
+}
+
 normalise <- function(x) {
   normalised <- numeric(length(x))
   normalised[1] = 0
@@ -97,15 +126,29 @@ normalise <- function(x) {
 
 ```{R}
 gaz$norm = normalise(gaz$wartosc)
+gaz$inflation =  calc_infl(gaz$wartosc)
 heat$norm = normalise(heat$wartosc)
+heat$inflation = calc_infl(heat$wartosc)
 water$norm = normalise(water$wartosc)
+water$inflation = calc_infl(water$wartosc)
 energy$norm = normalise(energy$wartosc)
-offset = infl_mies_modif$wartosc[1]
-infl_mies_modif <- infl_mies_modif %>% mutate(norm = infl_mies_modif$wartosc - offset)
+energy$inflation = calc_infl(energy$wartosc)
+bread$inflation = calc_infl(bread$wartosc)
+bread$norm = normalise(bread$wartosc)
+eggs$inflation = calc_infl(eggs$wartosc)
+eggs$norm = normalise(eggs$wartosc)
+chicken$inflation = calc_infl(chicken$wartosc)
+chicken$norm = normalise(chicken$wartosc)
+butter$inflation = calc_infl(butter$wartosc)
+butter$norm = normalise(butter$wartosc)
+cheese$inflation = calc_infl(cheese$wartosc)
+cheese$norm = calc_infl(cheese$wartosc)
+offset = infl_mies$norm[1]
+infl_mies <- infl_mies %>% mutate(norm = infl_mies$norm - offset)
 
-plot_data <- tibble(date = infl_mies_modif$date, gaz_norm = gaz$norm,
-  heat_norm = heat$norm,water_norm = water$norm,
-  energy_norm = energy$norm, infl_norm = infl_mies_modif$norm )
+plot_data <- tibble(date = infl_mies$date, gaz_norm = gaz$inflation,
+  heat_norm = heat$inflation, water_norm = water$inflation,
+  energy_norm = energy$inflation, infl_norm = infl_mies$inflation )
 
 plot <- ggplot(plot_data, aes(date)) + 
   geom_line(aes(y = gaz_norm, color = "Gaz ziemny wysokometanowy z sieci "),
@@ -116,12 +159,92 @@ plot <- ggplot(plot_data, aes(date)) +
   geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
   labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
   ggtitle("Zmiany cen") + 
-  theme(legend.position = "bottom") +
-  scale_x_date(date_labels = "%Y-%m", date_breaks = "2 month")
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  scale_x_date(date_labels = "%Y-%m")
   
 plot
 ```
 
+ Wykres inflacjii dla produktów spożywczych
+```{R}
+plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$inflation,
+  butter_i = butter$inflation, cheese_i = cheese$inflation,
+  eggs_i = eggs$inflation, bread_i = bread$inflation, infl_i = infl_mies$inflation)
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = cheese_i, color = "Ser "),
+   size = 1) +  
+  geom_line(aes(y = bread_i, color = "Chleb"), size = 1) +  
+  geom_line(aes(y = eggs_i, color = "Jaja kurze"), size = 1) +  
+  geom_line(aes(y = butter_i, color = "Masło"), size = 1) +  
+  geom_line(aes(y = chicken_i, color = "Kurczęta patroszone"), size = 1) +
+  geom_line(aes(y = infl_i, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
+  ggtitle("Zmiany cen") + 
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) + scale_x_date(date_labels = "%Y-%m")
+  
+plot
+```
+ Wykres znormalizowanego wzrostu ceny dla produktów spożywczych
+```{R}
+plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$norm,
+  butter_i = butter$norm, cheese_i = cheese$norm,
+  eggs_i = eggs$norm, bread_i = bread$norm, infl_i = infl_mies$norm)
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = cheese_i, color = "Ser "),
+   size = 1) +  
+  geom_line(aes(y = bread_i, color = "Chleb"), size = 1) +  
+  geom_line(aes(y = eggs_i, color = "Jaja kurze"), size = 1) +  
+  geom_line(aes(y = butter_i, color = "Masło"), size = 1) +  
+  geom_line(aes(y = chicken_i, color = "Kurczęta patroszone"), size = 1) +
+  geom_line(aes(y = infl_i, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
+  ggtitle("Zmiany cen") + 
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) + scale_x_date(date_labels = "%Y-%m")
+  
+plot
+```
+Wykres dla znormailzowanego wzrostu cen produktów nieżywnościowych
+```{R}
+plot_data <- tibble(date = infl_mies$date, gaz_norm = gaz$norm,
+  heat_norm = heat$norm, water_norm = water$norm,
+  energy_norm = energy$norm, infl_norm = infl_mies$norm )
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = gaz_norm, color = "Gaz ziemny wysokometanowy z sieci "),
+   size = 1) +  
+  geom_line(aes(y = heat_norm, color = "Centralne ogrzewanie"), size = 1) +  
+  geom_line(aes(y = water_norm, color = "Ciepła woda"), size = 1) +  
+  geom_line(aes(y = energy_norm, color = "Energia elektryczna"), size = 1) +  
+  geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
+  ggtitle("Zmiany cen") + 
+  theme(
+    legend.position = c(.95, .95),
+    legend.justification = c("right", "top"),
+    legend.box.just = "right",
+    legend.margin = margin(6, 6, 6, 6)
+    ) +
+  scale_x_date(date_labels = "%Y-%m")
+  
+plot
+```
 ## Zadanie 2
 
 Inflacja oraz nakład na badania i rozwój dla lat od 2000-2023
@@ -135,37 +258,45 @@ abs_value[1] =  infl$Wartosc[1] - 100.0
 for (i in 2:length(infl$Wartosc)){
     abs_value[i] <-  infl$Wartosc[i] - 100 + abs_value[i-1]
 }
-
-modif_inflation <- tibble(rok = infl$Rok, wartosc =abs_value)
-modif_inflation  <- modif_inflation  %>% filter(rok >= 2000, rok <= 2022)
-ggplot(data = modif_inflation , aes(x=rok, y = wartosc)) + geom_point() + 
+infl = infl %>% mutate(inflation = infl$Wartosc - 100)
+modif_inflation <- tibble(rok = infl$Rok, norm =abs_value, inflation = infl$inflation)
+modif_inflation  <- modif_inflation  %>% filter(rok >= 1999, rok <= 2022)
+ggplot(data = modif_inflation , aes(x=rok, y = norm)) + geom_point() + 
   labs(x = "Rok", y = "Inflacja") +
-  ggtitle("Inflacja lata 2000-2023")
-
+  ggtitle("Znormalizowany wzrost ceny na podstawie inflacji lata 2000-2023")
+```
+```{R}
+ggplot(data = modif_inflation , aes(x=rok, y = inflation)) + geom_line() + 
+  labs(x = "Rok", y = "Inflacja")
 
 ```
 ```{R}
-brl = read_csv2("brl.csv", show_col_types = FALSE)
-b = brl %>% select(id_zmienna, id_daty, wartosc)
-l = b %>% filter(id_zmienna == 581, id_daty <= 2022, id_daty >= 2000)
-b = b %>% filter(id_zmienna == 406, id_daty <= 2022, id_daty >= 2000)
-b = b %>% arrange(id_daty)
-l = l %>% arrange(id_daty)
-
-```
-
-```{R}
-b_all_money = b %>% mutate(wartosc = wartosc*l$wartosc)
-ggplot(data = b_all_money, aes(x=id_daty, y = wartosc)) + geom_point()
+brp = read_csv2("brp.csv", , show_col_types = FALSE)
+bp = brp %>% select(id_pozycja_2, id_daty, wartosc, id_przekroj)
+bp = brp %>% filter(id_pozycja_2 == 660892)
+bp = bp %>% arrange(id_daty)
+prod = brp %>% filter(id_przekroj == 16)
+prod = prod %>% arrange(id_daty)
+bp = bp %>% mutate(wart_calk = prod$wartosc * wartosc)
+gov = brp %>% filter(id_pozycja_2 == 546159)
+gov = gov %>% arrange(id_daty)
+gov = gov %>% mutate(wart_calk = prod$wartosc * wartosc)
+bes = brp %>% filter(id_pozycja_2 == 546157)
+bes = bes %>% arrange(id_daty)
+bes = bes %>% mutate(wart_calk = prod$wartosc * wartosc)
+hes = brp %>% filter(id_pozycja_2 == 546167)
+hes = hes %>% arrange(id_daty)
+hes = hes %>% mutate(wart_calk = prod$wartosc * wartosc)
+ggplot(data = bp, aes(x=id_daty, y = wart_calk)) + geom_point()
 ```
 
 ## Nałożone na siebie wartości inflacji oraz nakładów na badania i rozwój
 ```{R}
-b_all_money$norm = normalise(b_all_money$wartosc)
-offset = modif_inflation$wartosc[1]
-modif_inflation <- modif_inflation %>% mutate(norm = modif_inflation$wartosc - offset)
-plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$norm,
- b_norm = b_all_money$norm)
+bp$norm = normalise(bp$wart_calk)
+bp$inflation = calc_infl(bp$wart_calk)
+offset = modif_inflation$norm[1]
+modif_inflation <- modif_inflation %>% mutate(normal = modif_inflation$norm - offset)
+plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$inflation, b_norm = bp$inflation)
 plot <- ggplot(plot_data, aes(date)) + 
   geom_line(aes(y = b_norm, color = "Badania i rozwój"), size = 1) +  
   geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
@@ -174,4 +305,31 @@ plot <- ggplot(plot_data, aes(date)) +
   theme(legend.position = "bottom")
 plot
 
+```
+Różne sektory
+
+```{R}
+plot_data <- tibble(date = hes$id_daty, hes = hes$wart_calk, gov = gov$wart_calk, bes = bes$wart_calk, og = bp$wart_calk)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = hes, color = "Hes"), size = 1) +  
+  geom_line(aes(y = bes, color = "Bes"), size = 1) +  
+  geom_line(aes(y = gov, color = "GOV"), size = 1) +
+  geom_line(aes(y = og, color = "Całkowita"), size = 1) +  
+  labs(x = "Rok", y = "", color = "") +  
+  ggtitle("Nakłady na poszczególne sektory") + 
+  theme(legend.position = "bottom")
+plot
+```
+
+Wykres z procentową zmianą ceny
+
+```{R}
+plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$normal, b_norm = bp$norm)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = b_norm, color = "Badania i rozwój"), size = 1) +  
+  geom_line(aes(y = infl_norm, color = "Inflacja"), size = 1) +  
+  labs(x = "Rok", y = "", color = "") +  
+  ggtitle("Nakłądy na badania i rozwój oraz inflacja") + 
+  theme(legend.position = "bottom")
+plot
 ```

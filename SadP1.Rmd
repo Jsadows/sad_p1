@@ -246,7 +246,48 @@ plot <- ggplot(plot_data, aes(date)) +
 plot
 ggsave("r_wzgl_towary_jedz2.png")
 ```
+Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produktów niejedzeniowe
+```{R}
+trolley = gaz$wartosc + heat$wartosc + water$wartosc + energy$wartosc
+infl_trolley<- numeric(length(infl_mies$inflation))
+infl_trolley[1] = trolley[1]
+ for(i in 2:length(infl_mies$inflation)){
+    infl_trolley[i] = infl_trolley[i-1] + infl_trolley[i-1] * infl_mies$inflation[i]/100.0
+  }
 
+plot_data <- tibble(date = infl_mies$date, tr = trolley, infl_tr = infl_trolley)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = tr, color = "Rzeczywista wartość produktów niejedzeniowych"), size = 1) +  
+  geom_point(aes(y = tr, color = "Rzeczywista wartość produktów niejedzeniowych")) +
+  geom_line(aes(y = infl_tr, color = "Wartość produktów niejedzeniowych z inflacjii"), size = 1) +  
+  geom_point(aes(y = infl_tr, color = "Wartość produktów niejedzeniowych z inflacjii")) +
+  labs(x = "Rok", y = "Wartość [zł]", color = "") +  
+  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produktów niejedzeniowe") + 
+  theme(legend.position = "bottom") 
+plot
+ggsave("koszyki_pr_niejedz.png")
+```
+Wykresy koszyka dla produktów spożywczych
+```{R}
+trolley = bread$wartosc + eggs$wartosc + chicken$wartosc + butter$wartosc + cheese$wartosc
+infl_trolley<- numeric(length(infl_mies$inflation))
+infl_trolley[1] = trolley[1]
+ for(i in 2:length(infl_mies$inflation)){
+    infl_trolley[i] = infl_trolley[i-1] + infl_trolley[i-1] * infl_mies$inflation[i]/100.0
+  }
+
+plot_data <- tibble(date = infl_mies$date, tr = trolley, infl_tr = infl_trolley)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = tr, color = "Rzeczywista wartość produktów jedzeniowych"), size = 1) +  
+  geom_point(aes(y = tr, color = "Rzeczywista wartość produktów jedzeniowych")) +
+  geom_line(aes(y = infl_tr, color = "Wartość produktów jedzeniowych z inflacjii"), size = 1) +  
+  geom_point(aes(y = infl_tr, color = "Wartość produktów jedzeniowych z inflacjii")) +
+  labs(x = "Rok", y = "Wartość [zł]", color = "") +  
+  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produkty jedzeniowe") + 
+  theme(legend.position = "bottom") 
+plot
+ggsave("koszyki_pr_jedz.png")
+```
  Wykres znormalizowanego wzrostu ceny dla produktów spożywczych
 ```{R}
 plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$norm,
@@ -389,4 +430,25 @@ plot <- ggplot(plot_data, aes(date)) +
   ggtitle("Nakłady na badania i rozwój oraz inflacja") + 
   theme(legend.position = "bottom")
 plot
+```
+Wartość b+r wynikająca z infl
+```{R}
+
+infl_trolley<- numeric(length(modif_inflation$inflation))
+infl_trolley[1] = bp$wart_calk[1]
+ for(i in 2:length(modif_inflation$inflation)){
+    infl_trolley[i] = infl_trolley[i-1] + infl_trolley[i-1] * modif_inflation$inflation[i]/100.0
+  }
+
+plot_data <- tibble(date = modif_inflation$rok, tr = bp$wart_calk, infl_tr = infl_trolley)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = tr, color = "Rzeczywista wartość przeznaczona na B+R"), size = 1) +  
+  geom_point(aes(y = tr, color = "Rzeczywista wartość przeznaczona na B+R")) +
+  geom_line(aes(y = infl_tr, color = "Wartość B+R z inflacjii"), size = 1) +  
+  geom_point(aes(y = infl_tr, color = "Wartość B+R z inflacjii")) +
+  labs(x = "Rok", y = "Wartość [zł]", color = "") +  
+  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produkty jedzeniowe") + 
+  theme(legend.position = "bottom") 
+plot
+ggsave("br_i_infl.png")
 ```

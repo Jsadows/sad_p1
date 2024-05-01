@@ -3,11 +3,13 @@ title: "SAD- projekt 1"
 fontsize: 11pt
 geometry: margin=1in
 ---
+
 ## Autorzy
 
 Damian Lubaszka, Jakub Sadowski
 
 ## Wykożystane pakiety i ustawiena
+
 ```{R}
 require(tidyverse)
 theme_set(theme_bw())
@@ -16,6 +18,7 @@ theme_set(theme_bw())
 ## Zadanie 1
 
 Inflacja od 2020-07 do 2024-03
+
 ```{R}
 infl_mies <- read_csv2("inflacja_mies.csv", locale=locale(encoding="latin1"),
  show_col_types = FALSE)
@@ -26,35 +29,51 @@ infl_mies <- infl_mies %>%
 infl_mies <- infl_mies %>% filter(date < as.Date("2024-04-01"),
  date >= as.Date("2020-07-01"))
 infl_mies <- infl_mies %>% arrange(date)
+
 abs_value <- numeric(length(infl_mies$Wartosc))
+foldable_value <- numeric(length(infl_mies$Wartosc))
 inflation_col <- numeric(length(infl_mies$Wartosc))
-abs_value[1] =  infl_mies$Wartosc[1] - 100.0
-inflation_col[1] = infl_mies$Wartosc[1] - 100.0
-for (i in 2:length(infl_mies$Wartosc)){
-    abs_value[i] <-  infl_mies$Wartosc[i] - 100 + abs_value[i-1]
+
+foldable_value[1] =  100
+abs_value[1] =  0
+inflation_col[1] = 0
+
+foldable_value[2] =  infl_mies$Wartosc[2]
+abs_value[2] =  foldable_value[2] - 100
+inflation_col[2] = infl_mies$Wartosc[2] - 100.0
+
+for (i in 3:length(infl_mies$Wartosc)){
+    foldable_value[i] <- foldable_value[i-1]/100.0 * infl_mies$Wartosc[i]
+    abs_value[i] <-  foldable_value[i] - 100.0
     inflation_col[i] <- infl_mies$Wartosc[i] - 100.0
 }
+
+infl_mies$foldable_value = foldable_value
 infl_mies$norm = abs_value
 infl_mies$inflation = inflation_col
+
 ggplot(data = infl_mies, aes(x=date, y =norm)) + geom_point() + 
 scale_x_date(date_labels = "%Y-%m") +
- labs(x = "Rok i miesiąc", y = "Wzrost ceny względem roku 2020") 
+ labs(x = "Rok i miesiąc", y = "Procentowy wzrost ceny względem lipca roku 2020") 
+ 
+ ggsave("norm_inf-1.png")
 
 ```
+
 ```{R}
 ggplot(data = infl_mies, aes(x=date, y = inflation)) + geom_line() + geom_point() +
 scale_x_date(date_labels = "%Y-%m") +
 labs(x = "Rok i miesiąc", y = "Inflacja") 
 
+ggsave("inf-1.png")
 ```
-
 
 ```{R}
 products <- read_csv2("produkty.csv", locale=locale(encoding="latin1"),
   show_col_types = FALSE)
 products <- products %>% select(id_pozycja_3, wartosc, opis_okres, id_pozycja_2)
 products <- products %>% mutate(year_month = as.Date(paste(substr(opis_okres, 1, 4),
-  substr(opis_okres, 7, 8), "01",sep = "-")))
+substr(opis_okres, 7, 8), "01",sep = "-")))
 energy <- products %>% filter(id_pozycja_3 == 5946305)
 energy <- energy %>% arrange(year_month)
 water <- products %>% filter(id_pozycja_3 == 5946307)
@@ -75,13 +94,15 @@ cheese <- products %>% filter(id_pozycja_2 == 5967464)
 cheese <- cheese %>% arrange(year_month)
 ```
 
-## Oficjalna inflacja razem ze zmianami produktów 
+## Oficjalna inflacja razem ze zmianami produktów
+
 ```{R}
 calc_infl <- function(x) {
   infl <- numeric(length(x))
   infl[1] = 0
   for(i in 2:length(x)){
     infl[i] = x[i] * 100.0/x[i-1] - 100 
+    
   }
   infl
 }
@@ -90,10 +111,12 @@ normalise <- function(x) {
   normalised <- numeric(length(x))
   normalised[1] = 0
   for(i in 2:length(x)){
-    normalised[i] = x[i] * 100.0/x[i-1] - 100 + normalised[i-1]
+    normalised[i] = x[i] * 100.0/x[1] - 100
   }
   normalised
 }
+
+
 ```
 
 ```{R}
@@ -115,8 +138,6 @@ butter$inflation = calc_infl(butter$wartosc)
 butter$norm = normalise(butter$wartosc)
 cheese$inflation = calc_infl(cheese$wartosc)
 cheese$norm = calc_infl(cheese$wartosc)
-offset = infl_mies$norm[1]
-infl_mies <- infl_mies %>% mutate(norm = infl_mies$norm - offset)
 
 plot_data <- tibble(date = infl_mies$date, gaz_norm = gaz$inflation,
   heat_norm = heat$inflation, water_norm = water$inflation,
@@ -141,7 +162,9 @@ plot <- ggplot(plot_data, aes(date)) +
 plot
 ggsave("inflacja_towary_niejedzeniowe.png")
 ```
+
 Względna różnica towary nie jedzeniowe
+
 ```{R}
 plot_data <- tibble(date = infl_mies$date - infl_mies$inflation, gaz_norm = gaz$inflation - infl_mies$inflation,
   heat_norm = heat$inflation - infl_mies$inflation, water_norm = water$inflation - infl_mies$inflation,
@@ -166,8 +189,8 @@ plot
 ggsave("r_wzgl_towary_nie_jedz.png")
 ```
 
+Wykres inflacjii dla produktów spożywczych 1
 
- Wykres inflacjii dla produktów spożywczych
 ```{R}
 plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$inflation,
   butter_i = butter$inflation, cheese_i = cheese$inflation,
@@ -191,6 +214,7 @@ ggsave("infl_towary_jedze1.png")
 ```
 
 Wykres inflacjii dla produktów spożywczych 2
+
 ```{R}
 plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$inflation,
   butter_i = butter$inflation, cheese_i = cheese$inflation,
@@ -209,30 +233,19 @@ plot <- ggplot(plot_data, aes(date)) +
 plot
 ggsave("infl_towary_jedze2.png")
 ```
-Względna różnica
-```{R}
-  plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$inflation - infl_mies$inflation,
-  butter_i = butter$inflation - infl_mies$inflation, cheese_i = cheese$inflation - infl_mies$inflation,
-  eggs_i = eggs$inflation - infl_mies$inflation, bread_i = bread$inflation - infl_mies$inflation)
 
-plot <- ggplot(plot_data, aes(date)) + 
-  geom_line(aes(y = eggs_i, color = "Jaja kurze"), size = 1) +  
-  geom_point(aes(y = eggs_i, color = "Jaja kurze")) +
-  geom_line(aes(y = chicken_i, color = "Kurczęta"), size = 1) +
-  geom_point(aes(y = chicken_i, color = "Kurczęta")) +
-  labs(x = "Rok i miesiąc", y = "%", color = "Towary") + 
-  ggtitle("Względna różnica pomiędzy inflacją a inflacją rzeczywistą produktów") 
-  
-plot
-ggsave("r_wzgl_towary_jedz1.png")
-```
-Względna r 2
+Względna różnica pomiędzy inflacją a inflacją rzeczywistą produktów.
+
 ```{R}
 plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$inflation - infl_mies$inflation,
   butter_i = butter$inflation - infl_mies$inflation, cheese_i = cheese$inflation - infl_mies$inflation,
   eggs_i = eggs$inflation - infl_mies$inflation, bread_i = bread$inflation - infl_mies$inflation)
 
 plot <- ggplot(plot_data, aes(date)) + 
+   geom_line(aes(y = eggs_i, color = "Jaja kurze"), size = 1) +  
+  geom_point(aes(y = eggs_i, color = "Jaja kurze")) +
+  geom_line(aes(y = chicken_i, color = "Kurczęta"), size = 1) +
+  geom_point(aes(y = chicken_i, color = "Kurczęta")) +
   geom_line(aes(y = cheese_i, color = "Ser "),
    size = 1) +
   geom_point(aes(y = cheese_i, color = "Ser ")) +
@@ -244,9 +257,11 @@ plot <- ggplot(plot_data, aes(date)) +
   ggtitle("Względna różnica pomiędzy inflacją a inflacją rzeczywistą produktów") 
   
 plot
-ggsave("r_wzgl_towary_jedz2.png")
+ggsave("r_wzgl_towary_jedz.png")
 ```
+
 Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produktów niejedzeniowe
+
 ```{R}
 trolley = gaz$wartosc + heat$wartosc + water$wartosc + energy$wartosc
 infl_trolley<- numeric(length(infl_mies$inflation))
@@ -262,12 +277,15 @@ plot <- ggplot(plot_data, aes(date)) +
   geom_line(aes(y = infl_tr, color = "Wartość produktów niejedzeniowych z inflacjii"), size = 1) +  
   geom_point(aes(y = infl_tr, color = "Wartość produktów niejedzeniowych z inflacjii")) +
   labs(x = "Rok", y = "Wartość [zł]", color = "") +  
-  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produktów niejedzeniowe") + 
+  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produktów 
+  niejedzeniowe") + 
   theme(legend.position = "bottom") 
 plot
 ggsave("koszyki_pr_niejedz.png")
 ```
+
 Wykresy koszyka dla produktów spożywczych
+
 ```{R}
 trolley = bread$wartosc + eggs$wartosc + chicken$wartosc + butter$wartosc + cheese$wartosc
 infl_trolley<- numeric(length(infl_mies$inflation))
@@ -283,12 +301,15 @@ plot <- ggplot(plot_data, aes(date)) +
   geom_line(aes(y = infl_tr, color = "Wartość produktów jedzeniowych z inflacjii"), size = 1) +  
   geom_point(aes(y = infl_tr, color = "Wartość produktów jedzeniowych z inflacjii")) +
   labs(x = "Rok", y = "Wartość [zł]", color = "") +  
-  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produkty jedzeniowe") + 
+  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produkty
+  jedzeniowe") + 
   theme(legend.position = "bottom") 
 plot
 ggsave("koszyki_pr_jedz.png")
 ```
- Wykres znormalizowanego wzrostu ceny dla produktów spożywczych
+
+Wykres znormalizowanego wzrostu ceny dla produktów spożywczych
+
 ```{R}
 plot_data <- tibble(date = infl_mies$date, chicken_i = chicken$norm,
   butter_i = butter$norm, cheese_i = cheese$norm,
@@ -306,8 +327,12 @@ plot <- ggplot(plot_data, aes(date)) +
   ggtitle("Zmiany cen") 
 
 plot
+
+ggsave("norm_zm_jedz.png")
 ```
+
 Wykres dla znormailzowanego wzrostu cen produktów nieżywnościowych
+
 ```{R}
 plot_data <- tibble(date = infl_mies$date, gaz_norm = gaz$norm,
   heat_norm = heat$norm, water_norm = water$norm,
@@ -323,40 +348,69 @@ plot <- ggplot(plot_data, aes(date)) +
   labs(x = "Rok i miesiąc", y = "", color = "Towary") +  
   ggtitle("Zmiany cen") + 
   theme(
-    legend.position = c(.95, .95),
+    legend.position = c(.40, .95),
     legend.justification = c("right", "top"),
     legend.box.just = "right",
-    legend.margin = margin(6, 6, 6, 6)
+    legend.margin = margin(1, 1, 1, 1)
     ) +
   scale_x_date(date_labels = "%Y-%m")
   
 plot
+
+ggsave("norm_zm_niejedz.png")
 ```
+
 ## Zadanie 2
 
-Inflacja oraz nakład na badania i rozwój dla lat od 2000-2023
+Inflacja oraz nakład na badania i rozwój dla lat od 2000-2022
+
 ```{R}
 infl = read_csv2("inflacja.csv", locale=locale(encoding="latin1"),
   show_col_types = FALSE)
 infl = infl %>% select(Rok, Wartosc)
 infl = infl %>% arrange(Rok)
-abs_value <- numeric(length(infl$Wartosc))
-abs_value[1] =  infl$Wartosc[1] - 100.0
-for (i in 2:length(infl$Wartosc)){
-    abs_value[i] <-  infl$Wartosc[i] - 100 + abs_value[i-1]
-}
-infl = infl %>% mutate(inflation = infl$Wartosc - 100)
-modif_inflation <- tibble(rok = infl$Rok, norm =abs_value, inflation = infl$inflation)
+
+infl %>% mutate(inflation = infl$Wartosc - 100)
+modif_inflation <- tibble(rok = infl$Rok, wartosc=infl$Wartosc) 
+
 modif_inflation  <- modif_inflation  %>% filter(rok >= 1999, rok <= 2022)
+
+
+abs_value <- numeric(length(modif_inflation$wartosc))
+foldable_value <- numeric(length(modif_inflation$wartosc))
+
+foldable_value[1] =  100
+abs_value[1] =  0
+
+foldable_value[2] =  modif_inflation$wartosc[2]
+abs_value[2] =  foldable_value[2] - 100
+
+for (i in 3:length(modif_inflation$wartosc)){
+    foldable_value[i] <- foldable_value[i-1]/100.0 * modif_inflation$wartosc[i]
+    abs_value[i] <-  foldable_value[i] - 100.0
+}
+
+modif_inflation$foldable_value = foldable_value
+modif_inflation$norm = abs_value
+modif_inflation$inflation = modif_inflation$wartosc - 100
+
 ggplot(data = modif_inflation , aes(x=rok, y = norm)) + geom_point() + 
   labs(x = "Rok", y = "Inflacja") +
-  ggtitle("Znormalizowany wzrost ceny na podstawie inflacji lata 2000-2023")
-```
-```{R}
-ggplot(data = modif_inflation , aes(x=rok, y = inflation)) + geom_line() + geom_point()
-  labs(x = "Rok", y = "Inflacja")
+  ggtitle("Znormalizowany wzrost ceny na podstawie inflacji lata 2000-2022")
+
+ ggsave("norm_inf-2.png")
+
 
 ```
+
+```{R}
+ggplot(data = modif_inflation , aes(x=rok, y = inflation)) + geom_line() + geom_point()
+  labs(x = "Rok", y = "Inflacja [%]")
+
+ ggsave("inf-2.png")
+
+```
+
 ```{R}
 brp = read_csv2("brp.csv", , show_col_types = FALSE)
 bp = brp %>% select(id_pozycja_2, id_daty, wartosc, id_przekroj)
@@ -375,16 +429,16 @@ hes = brp %>% filter(id_pozycja_2 == 546167)
 hes = hes %>% arrange(id_daty)
 hes = hes %>% mutate(wart_calk = prod$wartosc * wartosc)
 ggplot(data = bp, aes(x=id_daty, y = wart_calk)) + geom_point() + geom_line() +
-labs(x = "Rok", y = "Wartość [zł]") +
+labs(x = "Rok", y = "Wartość [mln zł]") +
   ggtitle("Wykres nakładu na badania i rozwój w poszczególnych latach")
 ```
 
 ## Nałożone na siebie wartości inflacji oraz nakładów na badania i rozwój
+
 ```{R}
 bp$norm = normalise(bp$wart_calk)
 bp$inflation = calc_infl(bp$wart_calk)
-offset = modif_inflation$norm[1]
-modif_inflation <- modif_inflation %>% mutate(normal = modif_inflation$norm - offset)
+
 plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$inflation, b_norm = bp$inflation)
 plot <- ggplot(plot_data, aes(date)) + 
   geom_line(aes(y = b_norm, color = "Badania i rozwój"), size = 1) +  
@@ -397,6 +451,7 @@ plot <- ggplot(plot_data, aes(date)) +
 plot
 ggsave("badania_rozw_infl.png")
 ```
+
 Różne sektory
 
 ```{R}
@@ -410,7 +465,7 @@ plot <- ggplot(plot_data, aes(date)) +
   geom_point(aes(y = gov, color = "GOV")) +
   geom_line(aes(y = og, color = "Całkowita"), size = 1) +  
   geom_point(aes(y = og, color = "Całkowita")) +
-  labs(x = "Rok", y = "Wartość [zł]", color = "") +  
+  labs(x = "Rok", y = "Wartość [mln zł]", color = "") +  
   ggtitle("Nakłady na poszczególne sektory") + 
   theme(legend.position = "bottom") 
 plot
@@ -420,7 +475,7 @@ ggsave("bR_sektory.png")
 Wykres z procentową zmianą ceny
 
 ```{R}
-plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$normal, b_norm = bp$norm)
+plot_data <- tibble(date = modif_inflation$rok, infl_norm = modif_inflation$norm, b_norm = bp$norm)
 plot <- ggplot(plot_data, aes(date)) + 
   geom_line(aes(y = b_norm, color = "Badania i rozwój"), size = 1) +  
   geom_point(aes(y = b_norm, color = "Badania i rozwój")) +
@@ -431,7 +486,9 @@ plot <- ggplot(plot_data, aes(date)) +
   theme(legend.position = "bottom")
 plot
 ```
+
 Wartość b+r wynikająca z infl
+
 ```{R}
 
 infl_trolley<- numeric(length(modif_inflation$inflation))
@@ -446,9 +503,188 @@ plot <- ggplot(plot_data, aes(date)) +
   geom_point(aes(y = tr, color = "Rzeczywista wartość przeznaczona na B+R")) +
   geom_line(aes(y = infl_tr, color = "Wartość B+R z inflacjii"), size = 1) +  
   geom_point(aes(y = infl_tr, color = "Wartość B+R z inflacjii")) +
-  labs(x = "Rok", y = "Wartość [zł]", color = "") +  
-  ggtitle("Wartość koszyka wynikająca z inflacjii i wartość rzeczywista produkty jedzeniowe") + 
+  labs(x = "Rok", y = "Wartość [mln zł]", color = "") +  
+  ggtitle("Nakłady na badania i rozwój oraz inflacja") + 
   theme(legend.position = "bottom") 
 plot
 ggsave("br_i_infl.png")
+```
+
+## Zadanie 3
+
+Inflacja w kwartałach od 2020 do 2024
+
+```{R}
+infl_mies_3 <- read_csv2("inflacja_mies.csv", locale=locale(encoding="latin1"),
+ show_col_types = FALSE)
+infl_mies_3 <- infl_mies_3 %>% filter(reprezentacja == "Poprzedni miesiac = 100")
+infl_mies_3 <- infl_mies_3 %>% select(Rok, Miesiac,Wartosc)
+infl_mies_3 <- infl_mies_3 %>%
+  mutate(date = as.Date(sprintf("%04d-%02d-01", Rok, Miesiac)))
+infl_mies_3 <- infl_mies_3 %>% filter(date <= as.Date("2023-12-01"),
+ date >= as.Date("2020-01-01"))
+infl_mies_3 <- infl_mies_3 %>% arrange(date)
+infl_mies_3$opis_okres <- paste0(infl_mies_3$Rok, " Q", ceiling(infl_mies_3$Miesiac / 3))
+infl_q <- data.frame(opis_okres = character(), wartosc = numeric())
+
+for (q in unique(infl_mies_3$opis_okres)) {
+ data_q <- infl_mies_3 %>% filter(opis_okres == q)
+ value <- data_q$Wartosc[1] * data_q$Wartosc[2] * data_q$Wartosc[3] / 10000.0
+ infl_q <- rbind(infl_q, data.frame(opis_okres = q, wartosc = value))
+}
+
+```
+
+```{R}
+calculate_inflation <- function(data) {
+  abs_value <- numeric(length(data$wartosc))
+  foldable_value <- numeric(length(data$wartosc))
+  inflation_col <- numeric(length(data$wartosc))
+
+  foldable_value[1] <- data$wartosc[1]
+  abs_value[1] <- foldable_value[1] - 100
+  inflation_col[1] <- data$wartosc[1] - 100.0
+  
+  for (i in 2:length(data$wartosc)) {
+    foldable_value[i] <- foldable_value[i-1] / 100.0 * data$wartosc[i]
+    abs_value[i] <- foldable_value[i] - 100.0
+    inflation_col[i] <- data$wartosc[i] - 100.0
+  }
+  
+  data$foldable_value <- foldable_value
+  data$norm <- abs_value
+  data$inflation <- inflation_col
+  
+  return(data)
+}
+```
+
+```{R}
+m = read_csv2("mieszkania.csv", locale=locale(encoding="latin1"), col_types = cols(wartosc = "n"), show_col_types = FALSE)
+
+m_wt_ws = m %>% select(id_pozycja_2, opis_okres, wartosc, id_przekroj)
+m_wt_ws = m_wt_ws %>% filter(id_przekroj == 484)
+m_wt_ws = m_wt_ws %>% filter(id_pozycja_2 == 4801796)
+m_wt_ws <- m_wt_ws %>% select(-id_przekroj, -id_pozycja_2)
+m_wt_ws = m_wt_ws %>% arrange(opis_okres)
+
+m_pie_ws = m %>% select(id_pozycja_2, opis_okres, wartosc, id_przekroj)
+m_pie_ws = m_pie_ws %>% filter(id_przekroj == 484)
+m_pie_ws = m_pie_ws %>% filter(id_pozycja_2 == 4801795)
+m_pie_ws <- m_pie_ws %>% select(-id_przekroj, -id_pozycja_2)
+m_pie_ws = m_pie_ws %>% arrange(opis_okres)
+
+m_wt_med = m %>% select(id_pozycja_2, opis_okres, wartosc, id_przekroj)
+m_wt_med = m_wt_med %>% filter(id_przekroj == 485)
+m_wt_med = m_wt_med %>% filter(id_pozycja_2 == 4801796)
+m_wt_med <- m_wt_med %>% select(-id_przekroj, -id_pozycja_2)
+m_wt_med = m_wt_med %>% arrange(opis_okres)
+
+m_pie_med = m %>% select(id_pozycja_2, opis_okres, wartosc, id_przekroj)
+m_pie_med = m_pie_med %>% filter(id_przekroj == 485)
+m_pie_med = m_pie_med %>% filter(id_pozycja_2 == 4801795)
+m_pie_med <- m_pie_med %>% select(-id_przekroj, -id_pozycja_2)
+m_pie_med = m_pie_med %>% arrange(opis_okres)
+
+```
+
+```{R}
+
+infl_q <- calculate_inflation(infl_q)
+infl_q =  infl_q %>% arrange(opis_okres)
+m_pie_ws <- calculate_inflation(m_pie_ws)
+m_wt_ws <- calculate_inflation(m_wt_ws)
+
+```
+
+Inflacja w poszczególnych kwartałach
+
+```{R}
+
+plot_data <- tibble(date = infl_q$opis_okres, infl_q_inf= infl_q$inflation, m_pie_ws_inf= m_pie_ws$inflation, m_wt_ws_inf= m_wt_ws$inflation)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = infl_q_inf, color = "Inflacja cen towarów i usług", group = 1), size = 1) +  
+  geom_point(aes(y = infl_q_inf, color = "Inflacja cen towarów i usług")) +
+  geom_line(aes(y = m_pie_ws_inf, color = "Inflacja na rynku pierwotnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_pie_ws_inf, color = "Inflacja na rynku pierwotnym")) +
+  geom_line(aes(y = m_wt_ws_inf, color = "Inflacja na rynku wtórnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_wt_ws_inf, color = "Inflacja na rynku wtórnym")) +
+  labs(x = "Kwartał", y = "[%]", color = "") +  
+  ggtitle("Inflacja w poszczególnych kwartałach") + 
+  theme(legend.position = "bottom") +
+  scale_x_discrete(breaks = unique(plot_data$date)[seq(1, length(unique(plot_data$date)), by = 2)])
+
+plot
+ggsave("3_inf.png")
+
+```
+
+Unormowana inflacja w poszczególnych kwartałach
+
+```{R}
+
+plot_data <- tibble(date = infl_q$opis_okres, infl_q_inf= infl_q$norm, m_pie_ws_inf= m_pie_ws$norm, m_wt_ws_inf= m_wt_ws$norm)
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = infl_q_inf, color = "Inflacja cen towarów i usług", group = 1), size = 1) +  
+  geom_point(aes(y = infl_q_inf, color = "Inflacja cen towarów i usług")) +
+  geom_line(aes(y = m_pie_ws_inf, color = "Inflacja na rynku pierwotnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_pie_ws_inf, color = "Inflacja na rynku pierwotnym")) +
+  geom_line(aes(y = m_wt_ws_inf, color = "Inflacja na rynku wtórnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_wt_ws_inf, color = "Inflacja na rynku wtórnym")) +
+  labs(x = "Kwartał", y = "Procentowy wzrost cen", color = "") +  
+  ggtitle("Inflacja w poszczególnych kwartałach") + 
+  theme(legend.position = "bottom") +
+  scale_x_discrete(breaks = unique(plot_data$date)[seq(1, length(unique(plot_data$date)), by = 2)])
+
+plot
+ggsave("3_inf_norm.png")
+
+```
+
+```{R}
+m_wt_med$norm = normalise(m_wt_med$wartosc)
+m_wt_med$inflation =  calc_infl(m_wt_med$wartosc)
+m_pie_med$norm = normalise(m_pie_med$wartosc)
+m_pie_med$inflation = calc_infl(m_pie_med$wartosc)
+
+```
+
+```{R}
+plot_data <- tibble(date = infl_q$opis_okres, m_pie_med_wartosc= m_pie_med$wartosc, m_wt_med_wartosc= m_wt_med$wartosc)
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = m_pie_med_wartosc, color = "Rynek pierwotny", group = 1), size = 1) +  
+  geom_point(aes(y = m_pie_med_wartosc, color = "Rynek pierwotny")) +
+  geom_line(aes(y = m_wt_med_wartosc, color = "Rynek wtórny", group = 1), size = 1) +  
+  geom_point(aes(y = m_wt_med_wartosc, color = "Rynek wtórny")) +
+  labs(x = "Kwartał", y = "[zł / m ^ 2] ", color = "") +  
+  ggtitle("Mediana cen lokali") + 
+ 
+  scale_x_discrete(breaks = unique(plot_data$date)[seq(1, length(unique(plot_data$date)), by = 2)])
+
+plot
+ggsave("3_med.png")
+```
+
+Inflacja w poszczególnych kwartałach dla mediany cen za metr kwadratowy w porównaniu z oryginalną inflacją
+
+```{R}
+
+plot_data <- tibble(date = infl_q$opis_okres, infl_q_norm= infl_q$norm, m_pie_med_norm= m_pie_med$norm, m_wt_med_norm= m_wt_med$norm)
+
+plot <- ggplot(plot_data, aes(date)) + 
+  geom_line(aes(y = infl_q_norm, color = "Inflacja cen towarów i usług", group = 1), size = 1) +  
+  geom_point(aes(y = infl_q_norm, color = "Inflacja cen towarów i usług")) +
+  geom_line(aes(y = m_pie_med_norm, color = "Inflacja na rynku pierwotnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_pie_med_norm, color = "Inflacja na rynku pierwotnym")) +
+  geom_line(aes(y = m_wt_med_norm, color = "Inflacja na rynku wtórnym", group = 1), size = 1) +  
+  geom_point(aes(y = m_wt_med_norm, color = "Inflacja na rynku wtórnym")) +
+  labs(x = "Kwartał", y = "Procentowy wzrost cen", color = "") +  
+  ggtitle("Inflacja w poszczególnych kwartałach") + 
+ 
+  scale_x_discrete(breaks = unique(plot_data$date)[seq(1, length(unique(plot_data$date)), by = 2)])
+
+plot
+ggsave("3_inf_norm_med.png")
+
 ```
